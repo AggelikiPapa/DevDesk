@@ -47,8 +47,15 @@ notarization are not configured. `npm run dev` serves only the browser frontend.
 - `src-tauri/`: native shell and Tauri configuration.
 - `docs/` and `tests/`: existing documentation and test locations.
 
+DD-002 configures a movable, resizable, always-on-top window with standard macOS
+window controls. It starts with a 360 × 520 logical-pixel content area and cannot
+be resized below 300 × 400. It launches neither fullscreen nor maximized. Window
+position and size are not persisted; each new launch uses the configured size.
+Always-on-top applies above normal windows; no special behavior across macOS
+Spaces or fullscreen applications is configured.
+
 The frontend currently has no native API calls or Tauri plugins. No persistence,
-task/timer behavior, integrations, AI, or special window behavior is implemented.
+task/timer behavior, integrations, or AI is implemented.
 The broader solution design and implementation plan describe later tickets.
 
 The initial application identifier is `com.devdesk.desktop`; confirm ownership before
