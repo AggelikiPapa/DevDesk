@@ -2,8 +2,8 @@
 Personal Salesforce Developer Workbench
 
 DevDesk is a local-first macOS productivity and AI development workbench for
-Salesforce developers. DD-001 provides only a Tauri desktop shell and a minimal
-React placeholder confirming that the application is running.
+Salesforce developers. DD-003 adds a compact visual shell with sample tasks,
+a static elapsed-time display, and preview-only controls.
 
 ## Development on macOS
 
@@ -22,7 +22,7 @@ npm run tauri dev
 
 The Tauri command starts Vite and opens the native DevDesk window. The first run
 downloads and compiles Rust dependencies. Once dependencies are installed, the
-placeholder requires no external services.
+visual shell requires no external services.
 
 ## Checks and builds
 
@@ -53,6 +53,14 @@ be resized below 300 × 400. It launches neither fullscreen nor maximized. Windo
 position and size are not persisted; each new launch uses the configured size.
 Always-on-top applies above normal windows; no special behavior across macOS
 Spaces or fullscreen applications is configured.
+
+The UI uses the existing light theme and plain CSS. Sample data is isolated in
+`src/features/task-preview/mockData.ts`; display-only types live in
+`src/types/task-preview.ts`. All controls are focusable but marked unavailable
+with `aria-disabled` and an explanatory tooltip. They perform no actions.
+The paused sample shows Resume and Complete; the Add task button is also
+presentation-only. The native title bar supplies the application heading.
+The content scrolls vertically when needed at the minimum window size.
 
 The frontend currently has no native API calls or Tauri plugins. No persistence,
 task/timer behavior, integrations, or AI is implemented.

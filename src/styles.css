@@ -1,33 +1,55 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #202124;
-  background: #fafafa;
+  color-scheme: light;
+  color: #242a31;
+  background: #f7f8fa;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+  --muted: #58616e;
+  --accent: #275c50;
+  --line: #dce1e5;
 }
 
-body {
-  margin: 0;
-}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button { font: inherit; }
+h1, h2, h3, p { margin: 0; }
+button:focus-visible { outline: 3px solid #2765ba; outline-offset: 2px; }
 
-main {
-  box-sizing: border-box;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  text-align: center;
-}
+.app-shell { min-height: 100vh; padding: 10px 16px 0; display: flex; flex-direction: column; }
+main { display: grid; gap: 10px; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.section-heading h2 { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 650; }
+.current-task { background: #fff; padding: 10px 12px; border-radius: 9px; border: 1px solid var(--line); border-top: 3px solid var(--accent); }
+.task-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font-size: 11px; }
+.client { color: var(--accent); font-weight: 700; }
+.issue-key { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-weight: 600; }
+.current-task h3 { font-size: 19px; line-height: 1.25; font-weight: 650; letter-spacing: -0.4px; margin-top: 5px; overflow-wrap: anywhere; }
+.next-action { margin-top: 6px; padding-left: 9px; border-left: 2px solid #ccdcd6; }
+.eyebrow { font-size: 10px; color: var(--muted); }
+.next-action p { font-size: 12px; line-height: 1.45; margin-top: 2px; overflow-wrap: anywhere; }
+.timer { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: 9px; margin: 7px 0; }
+.elapsed-time { font-size: 27px; font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1.2; font-weight: 550; }
+.timer-caption { color: var(--muted); font-size: 10px; }
+.task-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.preview-button { min-height: 36px; min-width: 0; padding: 6px 8px; background: #f1f3f5; color: #343c46; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; font-weight: 600; cursor: not-allowed; }
+.preview-button.primary { color: #fff; background: var(--accent); border-color: var(--accent); }
+.status { color: var(--muted); font-size: 9px; line-height: 1.3; font-weight: 600; }
+.add-task { width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 5px; background: transparent; color: #343c46; font-size: 20px; line-height: 1; cursor: not-allowed; }
+.task-list { padding: 0; margin: 5px 0 0; list-style: none; }
+.task-list li + li { border-top: 1px solid var(--line); }
+.task-row { display: block; width: 100%; text-align: left; border: 0; border-radius: 3px; background: transparent; padding: 6px 0; cursor: not-allowed; color: inherit; }
+.row-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; }
+.row-meta .status { margin-left: auto; }
+.row-client { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+.row-title { display: block; font-size: 12px; line-height: 1.4; margin-top: 3px; overflow-wrap: anywhere; }
+.app-footer { margin-top: auto; padding: 4px 0 6px; }
+.app-footer nav { display: flex; justify-content: space-between; gap: 8px; border-top: 1px solid var(--line); padding-top: 2px; }
+.app-footer .preview-button { min-height: 30px; border-color: transparent; background: transparent; padding: 4px 5px; }
 
-h1 {
-  margin: 0 0 8px;
-  font-size: 28px;
-}
-
-p {
-  margin: 0;
-  color: #555;
+@media (max-width: 320px) {
+  .app-shell { padding-inline: 12px; }
+  .current-task { padding: 10px; }
+  .current-task h3 { font-size: 18px; }
 }
