@@ -1,0 +1,603 @@
+### DevDesk implementation sequence
+
+| Phase | Build | Result |
+|---|---|---|
+| **0** | Project foundation | Runnable Mac app + repo structure |
+| **1** | Local task manager | You can manage your real Jira tasks manually |
+| **2** | Time tracking | DevDesk becomes useful for actual daily work |
+| **3** | Context switching | It solves the main problem: interruptions |
+| **4** | Daily history | You can reconstruct what you worked on |
+| **5** | Jira integration | Tasks/context arrive automatically |
+| **6** | Git integration | DevDesk understands your development work |
+| **7** | Work AI Assistant | AI understands what you're currently doing |
+| **8** | Salesforce AI Assistant | AI helps investigate/review Salesforce work |
+| **9** | Outlook integration | Jira notifications automatically affect DevDesk |
+| **10** | Automation/polish | DevDesk becomes proactive |
+
+## Phase 0 — Build the foundation
+
+Don't start with Jira, Outlook, AI, authentication, etc.
+
+Create the repository and scaffold:
+
+**Tauri + React + TypeScript + SQLite**
+
+Repository structure:
+
+```text
+devdesk/
+├── AGENTS.md
+├── README.md
+├── docs/
+│   ├── product.md
+│   ├── solution-design.md
+│   ├── architecture.md
+│   └── decisions/
+├── src/
+│   ├── components/
+│   ├── features/
+│   ├── services/
+│   └── types/
+├── src-tauri/
+└── tests/
+```
+
+First milestone:
+
+> I can run `npm run tauri dev` and see an empty DevDesk floating window on my Mac.
+
+Also implement immediately: always-on-top, remembered window position/size, reasonable minimum dimensions, menu-bar access, and show/hide behavior.
+
+---
+
+# Phase 1 — Tasks
+
+Now create the fundamental object around which everything else revolves.
+
+Start simple:
+
+```text
+Task
+
+id
+client
+jiraKey
+title
+status
+nextAction
+createdAt
+updatedAt
+```
+
+Implement these states:
+
+```text
+NEW
+WORKING
+PAUSED
+WAITING_FOR_CLIENT
+WAITING_FOR_REVIEW
+DONE
+```
+
+UI might initially look like:
+
+```text
+┌─────────────────────────────────┐
+│ ACME                            │
+│ ABC-123                         │
+│ Fix contract generation        │
+│                                 │
+│ Next: investigate Apex trigger │
+│                                 │
+│          ▶ START               │
+├─────────────────────────────────┤
+│ ABC-124  Waiting for client    │
+│ XYZ-88   Paused                │
+└─────────────────────────────────┘
+```
+
+No Jira integration yet. Enter tasks manually.
+
+Use it for real work for a few days. You'll discover UX problems much faster than designing everything theoretically.
+
+---
+
+# Phase 2 — Time engine
+
+This is the first technically important subsystem.
+
+Do **not** store:
+
+```text
+ABC-123 = 02:43:16
+```
+
+Store sessions:
+
+```text
+ABC-123
+
+09:14 → 09:47
+10:32 → 11:05
+13:03 → 14:11
+```
+
+Data model:
+
+```text
+WorkSession
+
+id
+taskId
+startedAt
+endedAt
+```
+
+Then:
+
+```text
+Task time =
+SUM(endedAt - startedAt)
+```
+
+Implement Start, Pause, Resume and Complete.
+
+Crucially, enforce:
+
+> **Only one WorkSession can be active globally.**
+
+---
+
+# Phase 3 — Context switching
+
+This is where DevDesk starts solving your actual problem.
+
+Suppose you're working on:
+
+```text
+ABC-123
+00:43:21
+```
+
+Then somebody asks you to urgently investigate:
+
+```text
+XYZ-92
+```
+
+You click XYZ-92.
+
+DevDesk automatically:
+
+```text
+Pause ABC-123
+↓
+close ABC-123 session
+↓
+Start XYZ-92
+↓
+create XYZ-92 session
+```
+
+No:
+
+> stop → select → start → remember what I was doing.
+
+Also introduce **Next Action**.
+
+Before switching:
+
+```text
+ABC-123
+
+Next:
+Check why AccountService returns null
+```
+
+When you return three hours later, DevDesk tells you exactly where you stopped.
+
+This is one of the highest-value features in the entire application.
+
+---
+
+# Phase 4 — Event history + Today view
+
+Now introduce an event model.
+
+For example:
+
+```text
+09:03 Started ABC-123
+09:48 Paused ABC-123
+
+09:48 Started XYZ-92
+10:17 Paused XYZ-92
+
+10:17 Resumed ABC-123
+11:24 Paused ABC-123
+```
+
+Then build:
+
+**Today**
+
+```text
+ABC-123     1h 52m
+XYZ-92        29m
+DEF-442       41m
+
+Total       3h 02m
+```
+
+This becomes the foundation for both reporting **and AI reconstruction later**.
+
+---
+
+# Phase 5 — Jira integration
+
+Only now should Jira enter the architecture.
+
+Start read-only.
+
+Given:
+
+```text
+ABC-123
+```
+
+DevDesk retrieves:
+
+```text
+Summary
+Description
+Status
+Assignee
+Acceptance criteria
+Recent comments
+Jira URL
+```
+
+You should be able to do something like:
+
+```text
++ Add Jira Task
+
+ABC-123
+```
+
+and have DevDesk populate everything automatically.
+
+Later you can add Jira comments/status changes.
+
+Don't do Jira write operations initially.
+
+---
+
+# Phase 6 — Git integration
+
+This comes **before AI** because AI needs this context.
+
+DevDesk detects your repository and current branch.
+
+For example:
+
+```text
+Branch
+
+feature/ABC-123-contract-generation
+```
+
+DevDesk recognizes:
+
+```text
+ABC-123
+```
+
+and associates it automatically.
+
+Now the task can know:
+
+```text
+Jira
+ABC-123
+
+Repository
+customer-salesforce
+
+Branch
+feature/ABC-123-contract-generation
+
+Changed files
+AccountService.cls
+AccountServiceTest.cls
+contractGenerator.js
+```
+
+Eventually add PR detection.
+
+This dramatically improves the AI context later.
+
+---
+
+# Phase 7 — AI Context Builder + Work Assistant
+
+Don't start by building a chatbot.
+
+Build the **Context Builder** first.
+
+For the current task it assembles:
+
+```text
+TASK
+ABC-123
+
+CLIENT
+Client A
+
+JIRA
+description
+acceptance criteria
+comments
+
+WORK
+next action
+developer notes
+previous activity
+
+GIT
+repository
+branch
+changed files
+diff
+
+TIME
+sessions
+time spent
+```
+
+Then AI actions consume this context.
+
+Your first AI button should probably be:
+
+### Resume Task
+
+You return to ABC-123 after several hours.
+
+Click:
+
+**AI → Resume**
+
+DevDesk generates something like:
+
+> You're modifying contract generation for ABC-123.
+>
+> You identified that `AccountService.getContractAccount()` can return null when the billing account isn't populated.
+>
+> You modified `AccountService.cls` but haven't updated the corresponding test.
+>
+> Next action: reproduce the null case and add coverage to `AccountServiceTest.cls`.
+
+That directly solves your context-switching problem.
+
+Then add:
+
+**Summarize Jira**
+
+**Draft Client Update**
+
+**Draft PR Description**
+
+**Summarize Today's Work**
+
+---
+
+# Phase 8 — Salesforce Developer AI
+
+Now build the feature that differentiates DevDesk from normal productivity tools.
+
+The Salesforce assistant receives:
+
+```text
+Jira requirements
++
+Salesforce repository
++
+Git changes
++
+Developer notes
++
+task history
+```
+
+Start with four actions.
+
+### 1. Investigate Task
+
+```text
+AI
+↓
+Investigate ABC-123
+```
+
+Output:
+
+```text
+Likely relevant components
+
+AccountTrigger.trigger
+AccountTriggerHandler.cls
+AccountService.cls
+ContractGeneration.flow-meta.xml
+
+Possible implementation path
+
+1. Update AccountService
+2. Add null handling
+3. Update AccountServiceTest
+4. Validate Flow interaction
+
+Potential concerns
+
+- Trigger recursion
+- Bulkification
+- CRUD/FLS
+```
+
+### 2. Ask Salesforce
+
+Context-aware technical chat:
+
+> Where is this field populated?
+
+> What calls this Apex class?
+
+> Does this implementation handle bulk updates?
+
+> Why might this Flow run twice?
+
+Because DevDesk supplies repository/task context, you shouldn't need to repeatedly explain the project.
+
+### 3. Review Implementation
+
+This is particularly valuable.
+
+DevDesk compares:
+
+```text
+Jira Acceptance Criteria
+        ↕
+Git Diff
+```
+
+Then reports:
+
+```text
+✓ Requirement 1 appears implemented
+✓ Requirement 2 appears implemented
+
+⚠ Requirement 3:
+"No notification when Account inactive"
+
+No corresponding implementation found.
+
+⚠ AccountServiceTest does not appear
+to cover the new inactive-account branch.
+```
+
+### 4. Salesforce Review
+
+Review for issues such as:
+
+```text
+Bulkification
+SOQL in loops
+DML in loops
+CRUD/FLS
+Sharing
+Governor limits
+Null handling
+Test coverage
+Async patterns
+Flow recursion
+LWC error handling
+```
+
+Now DevDesk becomes a **Salesforce development assistant**, not merely a task tracker.
+
+---
+
+# Phase 9 — Outlook
+
+I deliberately put Outlook late.
+
+Your current process is:
+
+```text
+Jira
+ ↓
+Outlook email
+ ↓
+Pin email
+ ↓
+Remember task
+```
+
+Eventually DevDesk replaces that with:
+
+```text
+Jira notification
+        ↓
+     Outlook
+        ↓
+    DevDesk
+        ↓
+Task created/updated
+```
+
+Example:
+
+```text
+New Jira assignment detected
+
+ABC-422
+Fix opportunity validation
+
+[Add] [Ignore]
+```
+
+A comment notification could simply update the existing task:
+
+```text
+ABC-123
+
+New comment from client
+```
+
+At that point you should need pinned Jira emails far less.
+
+---
+
+# Phase 10 — Agents and automation
+
+Only after everything above works should you make DevDesk proactive.
+
+Examples:
+
+**Forgotten task**
+
+> ABC-123 has been PAUSED for two days but has an open PR.
+
+**Possible completion**
+
+> PR #142 for ABC-123 was merged. Mark task Done?
+
+**Missing PR**
+
+> ABC-456 has 2h 14m of work and modified files but no associated PR.
+
+**Time anomaly**
+
+> You worked on ABC-123 between 14:02–16:43 but the session is still running.
+
+The AI proposes actions rather than silently changing your work state.
+
+---
+
+## So our actual development roadmap
+
+I'd group all of this into **six releases**:
+
+| Release | Deliverable |
+|---|---|
+| **v0.1** | Mac window + local tasks |
+| **v0.2** | Session timer + automatic task switching |
+| **v0.3** | Next Action + notes + Today/history |
+| **v0.4** | Jira + Git context |
+| **v0.5** | AI Context Builder + Work Assistant |
+| **v0.6** | Salesforce Developer AI |
+| **v0.7** | Outlook + automation + reporting |
+
+The important part is that **v0.2 should already be useful enough that you actually start using DevDesk during work**. From then on, we should develop based partly on problems you notice while using it rather than trying to predict every feature now.
+
+And I would **not start coding yet with a giant Codex prompt saying "build DevDesk."** Our next step should be to break **v0.1 into individual GitHub-style development tickets**, each small enough to give Codex independently—for example `DD-001 Initialize Tauri application`, `DD-002 Configure floating window`, `DD-003 Create SQLite schema`, etc. That will make the codebase considerably easier to control as it grows.
