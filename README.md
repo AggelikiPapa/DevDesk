@@ -32,6 +32,7 @@ npm run typecheck
 npm test
 npm run build
 cargo check --manifest-path src-tauri/Cargo.toml
+cargo test --manifest-path src-tauri/Cargo.toml
 npm run tauri build
 ```
 
@@ -78,8 +79,33 @@ and is covered by `npm test` using Node's built-in test runner.
 Tauri's native file-drop handling is disabled so the webview can handle task
 drag-and-drop. File importing is not implemented.
 
-The frontend currently has no native API calls or Tauri plugins. No persistence,
-task/timer behavior, integrations, or AI is implemented.
+## Local persistence
+
+DD-004 adds the official Tauri 2 SQL plugin with its SQLite driver. The database
+URL is `sqlite:devdesk.db`, which resolves beneath Tauri's application config
+directory. On macOS the expected location is:
+
+```text
+~/Library/Application Support/com.devdesk.desktop/devdesk.db
+```
+
+Versioned SQL migrations live in `src-tauri/migrations/`. They are embedded in
+the binary, registered in `src-tauri/src/persistence.rs`, and applied atomically
+by the SQL plugin when the application starts. The plugin records applied
+versions in its own migration table and does not rerun a completed version.
+
+Persisted domain types live in `src/types/domain.ts`; they are deliberately
+separate from the DD-003 preview types. SQL access is isolated under
+`src/services/persistence/`, with focused client and task stores. React
+components contain no SQL, and the preview UI does not open or query the
+database yet.
+
+Client and task IDs are UUID v4 strings created with `crypto.randomUUID()`.
+Timestamps are UTC ISO 8601 text with millisecond precision. Task status is a
+TypeScript union and is also protected by a SQLite `CHECK` constraint. SQLite
+foreign keys prevent tasks from referencing missing clients.
+
+No task/timer UI behavior, integrations, or AI is implemented.
 The broader solution design and implementation plan describe later tickets.
 
 The initial application identifier is `com.devdesk.desktop`; confirm ownership before
