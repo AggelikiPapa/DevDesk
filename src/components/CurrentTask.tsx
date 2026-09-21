@@ -2,6 +2,7 @@ import type { CurrentTaskPreview } from "../types/task-preview";
 import { PreviewButton } from "./PreviewButton";
 
 export function CurrentTask({ task }: { task: CurrentTaskPreview }) {
+  const [hours, minutes] = task.elapsedTime.split(":");
   return (
     <section className="current-task" aria-labelledby="current-task-heading">
       <div className="section-heading">
@@ -18,8 +19,8 @@ export function CurrentTask({ task }: { task: CurrentTaskPreview }) {
         <p>{task.nextAction}</p>
       </div>
       <div className="timer">
-        <span className="elapsed-time" aria-label={`Elapsed time (hours, minutes, seconds): ${task.elapsedTime}`}>
-          {task.elapsedTime}
+        <span className="elapsed-time" aria-label={`Elapsed time (hours, minutes): ${hours}:${minutes}`}>
+          {hours}:{minutes}
         </span>
         <span className="timer-caption">Elapsed · sample</span>
       </div>

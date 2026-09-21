@@ -3,7 +3,8 @@ Personal Salesforce Developer Workbench
 
 DevDesk is a local-first macOS productivity and AI development workbench for
 Salesforce developers. DD-003 adds a compact visual shell with sample tasks,
-a static elapsed-time display, and preview-only controls.
+a static elapsed-time display, and preview-only task controls. The task list
+supports manual ordering within the current app session.
 
 ## Development on macOS
 
@@ -28,6 +29,7 @@ visual shell requires no external services.
 
 ```sh
 npm run typecheck
+npm test
 npm run build
 cargo check --manifest-path src-tauri/Cargo.toml
 npm run tauri build
@@ -49,18 +51,32 @@ notarization are not configured. `npm run dev` serves only the browser frontend.
 
 DD-002 configures a movable, resizable, always-on-top window with standard macOS
 window controls. It starts with a 360 × 520 logical-pixel content area and cannot
-be resized below 300 × 400. It launches neither fullscreen nor maximized. Window
+be resized below 260 × 320. It launches neither fullscreen nor maximized. Window
 position and size are not persisted; each new launch uses the configured size.
 Always-on-top applies above normal windows; no special behavior across macOS
 Spaces or fullscreen applications is configured.
 
+On macOS, the entire window fades to 65% opacity when it loses focus and returns
+to full opacity when focused. Its size and position do not change. This uses
+Tauri focus events and the public AppKit `NSWindow.alphaValue` API in
+`src-tauri/src/window_appearance.rs`; it does not enable macOS private APIs.
+
 The UI uses the existing light theme and plain CSS. Sample data is isolated in
 `src/features/task-preview/mockData.ts`; display-only types live in
-`src/types/task-preview.ts`. All controls are focusable but marked unavailable
+`src/types/task-preview.ts`. Task action and navigation controls are focusable but marked unavailable
 with `aria-disabled` and an explanatory tooltip. They perform no actions.
 The paused sample shows Resume and Complete; the Add task button is also
 presentation-only. The native title bar supplies the application heading.
 The content scrolls vertically when needed at the minimum window size.
+
+Elapsed time displays hours and minutes, without rounding up or discarding the
+seconds stored in the fixture. Drag a task's grip to another row to move it to
+that position, or focus the grip and use Up/Down arrows. Reordering only affects
+Other Tasks and resets on restart; it does not change the current task or status.
+The pure ordering function lives in `src/features/task-preview/reorderTasks.ts`
+and is covered by `npm test` using Node's built-in test runner.
+Tauri's native file-drop handling is disabled so the webview can handle task
+drag-and-drop. File importing is not implemented.
 
 The frontend currently has no native API calls or Tauri plugins. No persistence,
 task/timer behavior, integrations, or AI is implemented.
