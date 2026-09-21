@@ -23,6 +23,10 @@ function sqlite(path, sql, json = false) {
   return result;
 }
 
+function jsonRows(result) {
+  return result.stdout.trim() ? JSON.parse(result.stdout) : [];
+}
+
 function initialize(path) {
   const result = sqlite(path, migration);
   assert.equal(result.status, 0, result.stderr);
@@ -102,4 +106,75 @@ test("rejects a task whose client does not exist", () => {
   );
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /FOREIGN KEY constraint failed/);
+});
+
+test("an empty database contains no sample tasks", () => {
+  const path = databasePath();
+  initialize(path);
+  const result = sqlite(path, "SELECT count(*) AS count FROM tasks;", true);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), [{ count: 0 }]);
+});
+
+test("task changes survive reconnect and archive preserves the record", () => {
+  const path = databasePath();
+  initialize(path);
+  insertClient(path);
+  const create = sqlite(
+    path,
+    `INSERT INTO tasks (
+       id, client_id, external_key, title, status, next_action, created_at, updated_at
+     ) VALUES (
+       'task-1', 'client-1', NULL, 'Initial task', 'NEW', NULL, '${timestamp}', '${timestamp}'
+     );`,
+  );
+  assert.equal(create.status, 0, create.stderr);
+
+  const afterReconnect = sqlite(
+    path,
+    "SELECT title, status, archived_at FROM tasks WHERE id = 'task-1';",
+    true,
+  );
+  assert.deepEqual(JSON.parse(afterReconnect.stdout), [
+    { title: "Initial task", status: "NEW", archived_at: null },
+  ]);
+
+  const edit = sqlite(
+    path,
+    `UPDATE tasks
+     SET external_key = 'ENW-200', title = 'Edited task', next_action = 'Review it',
+         status = 'DONE', updated_at = '2026-09-21T12:35:00.000Z'
+     WHERE id = 'task-1';`,
+  );
+  assert.equal(edit.status, 0, edit.stderr);
+
+  const persistedEdit = sqlite(
+    path,
+    "SELECT external_key, title, next_action, status FROM tasks WHERE id = 'task-1';",
+    true,
+  );
+  assert.deepEqual(JSON.parse(persistedEdit.stdout), [{
+    external_key: "ENW-200",
+    title: "Edited task",
+    next_action: "Review it",
+    status: "DONE",
+  }]);
+
+  const archive = sqlite(
+    path,
+    `UPDATE tasks
+     SET archived_at = '2026-09-21T12:36:00.000Z', updated_at = '2026-09-21T12:36:00.000Z'
+     WHERE id = 'task-1';`,
+  );
+  assert.equal(archive.status, 0, archive.stderr);
+
+  const active = sqlite(path, "SELECT id FROM tasks WHERE archived_at IS NULL;", true);
+  const retained = sqlite(path, "SELECT id, status, archived_at FROM tasks;", true);
+  assert.deepEqual(jsonRows(active), []);
+  assert.deepEqual(JSON.parse(retained.stdout), [{
+    id: "task-1",
+    status: "DONE",
+    archived_at: "2026-09-21T12:36:00.000Z",
+  }]);
 });

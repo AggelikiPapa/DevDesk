@@ -1,83 +1,48 @@
-import { useState } from "react";
-import type { TaskPreview } from "../types/task-preview";
+import type { Client, Task, TaskId } from "../types/domain.ts";
+import { clientLabel, formatStatus } from "../features/tasks/taskPresentation.ts";
 
 interface TaskListProps {
-  tasks: TaskPreview[];
-  onReorder: (sourceKey: string, targetKey: string) => void;
+  tasks: Task[];
+  clients: Client[];
+  selectedTaskId: TaskId | null;
+  onSelect: (taskId: TaskId) => void;
+  onAdd: () => void;
 }
 
-export function TaskList({ tasks, onReorder }: TaskListProps) {
-  const [draggedKey, setDraggedKey] = useState<string | null>(null);
-  const [dropKey, setDropKey] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState("");
-
-  function move(sourceKey: string, targetKey: string) {
-    const position = tasks.findIndex((task) => task.issueKey === targetKey);
-    if (position < 0 || sourceKey === targetKey) return;
-    onReorder(sourceKey, targetKey);
-    setAnnouncement(`${sourceKey} moved to position ${position + 1} of ${tasks.length}.`);
-  }
-
-  function clearDrag() {
-    setDraggedKey(null);
-    setDropKey(null);
-  }
-
+export function TaskList({ tasks, clients, selectedTaskId, onSelect, onAdd }: TaskListProps) {
   return (
-    <section className="other-tasks" aria-labelledby="other-tasks-heading">
+    <section className="other-tasks" aria-labelledby="tasks-heading">
       <div className="section-heading">
-        <h2 id="other-tasks-heading">Other tasks</h2>
-        <button type="button" className="add-task" aria-label="Add task" aria-disabled="true"
-          title="Unavailable in this visual preview">+</button>
+        <h2 id="tasks-heading">Tasks</h2>
+        <button type="button" className="add-task" aria-label="Add task" onClick={onAdd}>+</button>
       </div>
-      <p id="reorder-help" className="sr-only">Drag to reorder, or focus a task's move handle and use the Up and Down arrow keys.</p>
-      <p className="sr-only" role="status">{announcement}</p>
-      <ul className="task-list">
-        {tasks.map((task, index) => (
-          <li key={task.issueKey}
-            className={`task-list-item${dropKey === task.issueKey ? " drop-target" : ""}`}
-            onDragOver={(event) => {
-              if (!draggedKey) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              setDropKey(task.issueKey);
-            }}
-            onDragLeave={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropKey(null);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              if (draggedKey) move(draggedKey, task.issueKey);
-              clearDrag();
-            }}>
-            <button type="button" className="move-task" draggable
-              aria-label={`Move ${task.issueKey}`} aria-describedby="reorder-help"
-              title="Drag to reorder · use ↑ or ↓ when focused"
-              onDragStart={(event) => {
-                setDraggedKey(task.issueKey);
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", task.issueKey);
-              }}
-              onDragEnd={clearDrag}
-              onKeyDown={(event) => {
-                if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-                event.preventDefault();
-                const target = tasks[index + (event.key === "ArrowUp" ? -1 : 1)];
-                if (target) move(task.issueKey, target.issueKey);
-              }}>
-              <span aria-hidden="true">⠿</span>
-            </button>
-            <button type="button" className="task-row" aria-disabled="true" title="Unavailable in this visual preview">
-              <span className="row-meta">
-                <span className="issue-key">{task.issueKey}</span>
-                <span className="row-client">{task.client}</span>
-                <span className="status">{task.status}</span>
-              </span>
-              <span className="row-title">{task.title}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+      {tasks.length === 0 ? (
+        <div className="empty-state">
+          <h3>No tasks yet</h3>
+          <p>Add your first task to start organizing your work.</p>
+          <button type="button" className="primary" onClick={onAdd}>+ Add task</button>
+        </div>
+      ) : (
+        <ul className="task-list">
+          {tasks.map((task) => (
+            <li key={task.id}>
+              <button
+                type="button"
+                className={`task-row${selectedTaskId === task.id ? " selected" : ""}`}
+                aria-pressed={selectedTaskId === task.id}
+                onClick={() => onSelect(task.id)}
+              >
+                <span className="row-meta">
+                  {task.externalKey && <span className="issue-key">{task.externalKey}</span>}
+                  <span className="row-client">{clientLabel(clients, task.clientId)}</span>
+                  <span className="status">{formatStatus(task.status)}</span>
+                </span>
+                <span className="row-title">{task.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

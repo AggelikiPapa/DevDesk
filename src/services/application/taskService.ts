@@ -16,12 +16,19 @@ export interface CreateTaskInput {
   nextAction?: string | null;
 }
 
+export interface UpdateTaskDetailsInput {
+  externalKey?: string | null;
+  title: string;
+  nextAction?: string | null;
+}
+
 export interface TaskApplicationService {
   createTask(input: CreateTaskInput): Promise<Task>;
   getTask(id: string): Promise<Task>;
   listActiveTasks(): Promise<Task[]>;
   updateTaskTitle(id: string, title: string): Promise<Task>;
   updateTaskNextAction(id: string, nextAction: string | null): Promise<Task>;
+  updateTaskDetails(id: string, input: UpdateTaskDetailsInput): Promise<Task>;
   changeTaskStatus(id: string, status: TaskStatus): Promise<Task>;
   archiveTask(id: string): Promise<Task>;
 }
@@ -72,6 +79,17 @@ export function createTaskApplicationService(
       const changed = await store.updateTaskNextAction(
         id,
         optionalText(nextAction),
+        currentTimestamp(),
+      );
+      return finishMutation(id, changed);
+    },
+
+    async updateTaskDetails(id, input) {
+      const changed = await store.updateTaskDetails(
+        id,
+        optionalText(input.externalKey),
+        requiredText(input.title, "Task title"),
+        optionalText(input.nextAction),
         currentTimestamp(),
       );
       return finishMutation(id, changed);

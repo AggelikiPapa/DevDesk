@@ -66,6 +66,9 @@ function createFixture() {
     async updateTaskNextAction(id, nextAction, updatedAt) {
       return updateTaskWithTimestamp(id, { nextAction }, updatedAt);
     },
+    async updateTaskDetails(id, externalKey, title, nextAction, updatedAt) {
+      return updateTaskWithTimestamp(id, { externalKey, title, nextAction }, updatedAt);
+    },
     async changeTaskStatus(id, status, updatedAt) {
       return updateTaskWithTimestamp(id, { status }, updatedAt);
     },
@@ -183,6 +186,22 @@ test("updates next action and stores whitespace-only input as null", async () =>
   const cleared = await fixture.taskService.updateTaskNextAction(task.id, "   ");
   assert.equal(cleared.nextAction, null);
   assert.ok(cleared.updatedAt > withAction.updatedAt);
+});
+
+test("atomically updates and normalizes editable task details", async () => {
+  const fixture = createFixture();
+  const { task } = await createClientAndTask(fixture);
+
+  const updated = await fixture.taskService.updateTaskDetails(task.id, {
+    externalKey: "  ENW-200  ",
+    title: "  Revised details  ",
+    nextAction: "   ",
+  });
+
+  assert.equal(updated.externalKey, "ENW-200");
+  assert.equal(updated.title, "Revised details");
+  assert.equal(updated.nextAction, null);
+  assert.ok(updated.updatedAt > task.updatedAt);
 });
 
 test("persists valid statuses and rejects invalid statuses", async () => {

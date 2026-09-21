@@ -27,6 +27,13 @@ export interface TaskStore {
   listActiveTasks(): Promise<Task[]>;
   updateTaskTitle(id: string, title: string, updatedAt: string): Promise<boolean>;
   updateTaskNextAction(id: string, nextAction: string | null, updatedAt: string): Promise<boolean>;
+  updateTaskDetails(
+    id: string,
+    externalKey: string | null,
+    title: string,
+    nextAction: string | null,
+    updatedAt: string,
+  ): Promise<boolean>;
   changeTaskStatus(id: string, status: TaskStatus, updatedAt: string): Promise<boolean>;
   archiveTask(id: string, archivedAt: string): Promise<boolean>;
 }
@@ -132,6 +139,29 @@ export async function updateTaskNextAction(
   return result.rowsAffected === 1;
 }
 
+export async function updateTaskDetails(
+  id: string,
+  externalKey: string | null,
+  title: string,
+  nextAction: string | null,
+  updatedAt: string,
+): Promise<boolean> {
+  const database = await getDatabase();
+  const result = await database.execute(
+    `UPDATE tasks
+     SET external_key = $1,
+         title = $2,
+         next_action = $3,
+         updated_at = CASE
+           WHEN updated_at < $4 THEN $4
+           ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+         END
+     WHERE id = $5`,
+    [externalKey, title, nextAction, updatedAt, id],
+  );
+  return result.rowsAffected === 1;
+}
+
 export async function changeTaskStatus(
   id: string,
   status: TaskStatus,
@@ -176,6 +206,7 @@ export const taskStore: TaskStore = {
   getTask,
   listActiveTasks,
   updateTaskNextAction,
+  updateTaskDetails,
   updateTaskTitle,
 };
 
