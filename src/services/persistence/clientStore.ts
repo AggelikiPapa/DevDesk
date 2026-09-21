@@ -1,5 +1,5 @@
-import type { Client } from "../../types/domain";
-import { getDatabase } from "./database";
+import type { Client } from "../../types/domain.ts";
+import { getDatabase } from "./database.ts";
 
 interface ClientRow {
   id: string;
@@ -12,6 +12,12 @@ interface ClientRow {
 export interface CreateClientInput {
   name: string;
   displayName?: string | null;
+}
+
+export interface ClientStore {
+  createClient(input: CreateClientInput): Promise<Client>;
+  getClient(id: string): Promise<Client | null>;
+  listClients(): Promise<Client[]>;
 }
 
 export async function createClient(input: CreateClientInput): Promise<Client> {
@@ -44,6 +50,25 @@ export async function listClients(): Promise<Client[]> {
 
   return rows.map(mapClient);
 }
+
+export async function getClient(id: string): Promise<Client | null> {
+  const database = await getDatabase();
+  const rows = await database.select<ClientRow[]>(
+    `SELECT id, name, display_name, created_at, updated_at
+     FROM clients
+     WHERE id = $1
+     LIMIT 1`,
+    [id],
+  );
+
+  return rows[0] ? mapClient(rows[0]) : null;
+}
+
+export const clientStore: ClientStore = {
+  createClient,
+  getClient,
+  listClients,
+};
 
 function mapClient(row: ClientRow): Client {
   return {

@@ -1,5 +1,5 @@
-import type { ClientId, Task, TaskStatus } from "../../types/domain";
-import { getDatabase } from "./database";
+import type { ClientId, Task, TaskStatus } from "../../types/domain.ts";
+import { getDatabase } from "./database.ts";
 
 interface TaskRow {
   id: string;
@@ -19,6 +19,16 @@ export interface CreateTaskInput {
   title: string;
   status?: TaskStatus;
   nextAction?: string | null;
+}
+
+export interface TaskStore {
+  createTask(input: CreateTaskInput): Promise<Task>;
+  getTask(id: string): Promise<Task | null>;
+  listActiveTasks(): Promise<Task[]>;
+  updateTaskTitle(id: string, title: string, updatedAt: string): Promise<boolean>;
+  updateTaskNextAction(id: string, nextAction: string | null, updatedAt: string): Promise<boolean>;
+  changeTaskStatus(id: string, status: TaskStatus, updatedAt: string): Promise<boolean>;
+  archiveTask(id: string, archivedAt: string): Promise<boolean>;
 }
 
 export async function createTask(input: CreateTaskInput): Promise<Task> {
@@ -69,6 +79,105 @@ export async function listActiveTasks(): Promise<Task[]> {
 
   return rows.map(mapTask);
 }
+
+export async function getTask(id: string): Promise<Task | null> {
+  const database = await getDatabase();
+  const rows = await database.select<TaskRow[]>(
+    `SELECT id, client_id, external_key, title, status, next_action,
+            created_at, updated_at, archived_at
+     FROM tasks
+     WHERE id = $1
+     LIMIT 1`,
+    [id],
+  );
+
+  return rows[0] ? mapTask(rows[0]) : null;
+}
+
+export async function updateTaskTitle(
+  id: string,
+  title: string,
+  updatedAt: string,
+): Promise<boolean> {
+  const database = await getDatabase();
+  const result = await database.execute(
+    `UPDATE tasks
+     SET title = $1,
+         updated_at = CASE
+           WHEN updated_at < $2 THEN $2
+           ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+         END
+     WHERE id = $3`,
+    [title, updatedAt, id],
+  );
+  return result.rowsAffected === 1;
+}
+
+export async function updateTaskNextAction(
+  id: string,
+  nextAction: string | null,
+  updatedAt: string,
+): Promise<boolean> {
+  const database = await getDatabase();
+  const result = await database.execute(
+    `UPDATE tasks
+     SET next_action = $1,
+         updated_at = CASE
+           WHEN updated_at < $2 THEN $2
+           ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+         END
+     WHERE id = $3`,
+    [nextAction, updatedAt, id],
+  );
+  return result.rowsAffected === 1;
+}
+
+export async function changeTaskStatus(
+  id: string,
+  status: TaskStatus,
+  updatedAt: string,
+): Promise<boolean> {
+  const database = await getDatabase();
+  const result = await database.execute(
+    `UPDATE tasks
+     SET status = $1,
+         updated_at = CASE
+           WHEN updated_at < $2 THEN $2
+           ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+         END
+     WHERE id = $3`,
+    [status, updatedAt, id],
+  );
+  return result.rowsAffected === 1;
+}
+
+export async function archiveTask(id: string, archivedAt: string): Promise<boolean> {
+  const database = await getDatabase();
+  const result = await database.execute(
+    `UPDATE tasks
+     SET archived_at = CASE
+           WHEN updated_at < $1 THEN $1
+           ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+         END,
+         updated_at = CASE
+           WHEN updated_at < $1 THEN $1
+           ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
+         END
+     WHERE id = $2`,
+    [archivedAt, id],
+  );
+  return result.rowsAffected === 1;
+}
+
+export const taskStore: TaskStore = {
+  archiveTask,
+  changeTaskStatus,
+  createTask,
+  getTask,
+  listActiveTasks,
+  updateTaskNextAction,
+  updateTaskTitle,
+};
 
 function mapTask(row: TaskRow): Task {
   return {

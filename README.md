@@ -100,6 +100,14 @@ separate from the DD-003 preview types. SQL access is isolated under
 components contain no SQL, and the preview UI does not open or query the
 database yet.
 
+DD-005 adds focused application services under `src/services/application/`.
+They expose client creation/retrieval/listing and task creation, retrieval,
+active listing, title and next-action updates, status changes, and archival.
+The services normalize text, validate task status, and turn missing records
+into clear typed errors before future UI code consumes them. Store mutations
+use targeted SQL updates, and archiving sets timestamps without deleting or
+otherwise changing the task. A `DONE` task remains active until it is archived.
+
 Client and task IDs are UUID v4 strings created with `crypto.randomUUID()`.
 Timestamps are UTC ISO 8601 text with millisecond precision. Task status is a
 TypeScript union and is also protected by a SQLite `CHECK` constraint. SQLite
