@@ -1,5 +1,6 @@
 export type ClientId = string;
 export type TaskId = string;
+export type WorkSessionId = string;
 export type UtcTimestamp = string;
 
 export interface Client {
@@ -31,4 +32,12 @@ export interface Task {
   createdAt: UtcTimestamp;
   updatedAt: UtcTimestamp;
   archivedAt: UtcTimestamp | null;
+}
+
+export interface WorkSession {
+  id: WorkSessionId;
+  taskId: TaskId;
+  startedAt: UtcTimestamp;
+  endedAt: UtcTimestamp | null;
+  createdAt: UtcTimestamp;
 }

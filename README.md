@@ -107,6 +107,28 @@ foreign keys prevent tasks from referencing missing clients.
 No timer/session behavior, integrations, or AI is implemented.
 The broader solution design and implementation plan describe later tickets.
 
+## Work sessions
+
+DD-007 adds `work_sessions` as the durable source of recorded time. Each session
+belongs to a task and stores UTC ISO-8601 start, optional end, and creation
+timestamps. Recorded duration is calculated from session intervals and is never
+stored as a mutable task counter. Archiving a task retains its sessions, while
+the foreign key restricts deleting a task that has time history.
+
+SQLite enforces one globally active session with a partial unique index on a
+constant value for rows where `ended_at IS NULL`. It also rejects sessions whose
+end precedes their start. Migration `0002_create_work_sessions.sql` is registered
+after the existing client/task migration.
+
+The WorkSession application service intentionally exposes read operations and
+duration calculation only. Session creation and closure remain low-level store
+operations until the time engine can coordinate them with task status changes.
+The frontend SQL plugin does not expose a transaction handle: separate calls use
+a SQLx connection pool and cannot safely bracket `BEGIN`/`COMMIT`. DD-008 should
+therefore implement narrow native Rust commands that acquire one SQLite pool
+connection and perform each Start, Pause, or Switch workflow in one SQLx
+transaction.
+
 The initial application identifier is `com.devdesk.desktop`; confirm ownership before
 distribution because changing it later can affect OS identity and data paths.
 
