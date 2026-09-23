@@ -11,7 +11,22 @@ export default function App() {
   const workspace = useTaskWorkspace();
   const [form, setForm] = useState<"add" | "edit" | "archive" | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
+  const [reorderBusy, setReorderBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  async function changeSelectedTimer() {
+    if (!workspace.selectedTask) return;
+    setActionError(null);
+    try {
+      if (workspace.activeSession?.taskId === workspace.selectedTask.id) {
+        await workspace.pauseTask(workspace.selectedTask.id);
+      } else {
+        await workspace.startOrSwitchTask(workspace.selectedTask.id);
+      }
+    } catch (error) {
+      setActionError(errorMessage(error));
+    }
+  }
 
   async function completeSelectedTask() {
     if (!workspace.selectedTask) return;
@@ -19,6 +34,19 @@ export default function App() {
     setActionError(null);
     try {
       await workspace.completeTask(workspace.selectedTask.id);
+    } catch (error) {
+      setActionError(errorMessage(error));
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function reopenSelectedTask() {
+    if (!workspace.selectedTask) return;
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      await workspace.reopenTask(workspace.selectedTask.id);
     } catch (error) {
       setActionError(errorMessage(error));
     } finally {
@@ -47,16 +75,23 @@ export default function App() {
           <p className="loading-state" role="status">Loading tasks…</p>
         ) : (
           <>
-            {(workspace.loadError || actionError) && (
-              <p className="app-error" role="alert">{workspace.loadError || actionError}</p>
+            {(workspace.loadError || actionError || workspace.durationError) && (
+              <p className="app-error" role="alert">
+                {workspace.loadError || actionError || workspace.durationError}
+              </p>
             )}
             {workspace.selectedTask && (
               <CurrentTask
                 task={workspace.selectedTask}
                 clientName={clientLabel(workspace.clients, workspace.selectedTask.clientId)}
-                busy={actionBusy}
+                activeSession={workspace.activeSession}
+                activeTaskLabel={workspace.activeTask?.externalKey || workspace.activeTask?.title || null}
+                duration={workspace.duration}
+                busy={actionBusy || workspace.timeBusy}
                 onEdit={() => setForm("edit")}
+                onTimeAction={() => { void changeSelectedTimer(); }}
                 onComplete={() => { void completeSelectedTask(); }}
+                onReopen={() => { void reopenSelectedTask(); }}
                 onArchive={() => setForm("archive")}
               />
             )}
@@ -64,8 +99,24 @@ export default function App() {
               tasks={workspace.tasks}
               clients={workspace.clients}
               selectedTaskId={workspace.selectedTaskId}
-              onSelect={workspace.selectTask}
+              onSelect={(taskId) => {
+                setActionError(null);
+                workspace.selectTask(taskId);
+              }}
               onAdd={() => setForm("add")}
+              reorderBusy={reorderBusy}
+              onReorder={async (sourceId, targetId) => {
+                setReorderBusy(true);
+                setActionError(null);
+                try {
+                  await workspace.reorderTasks(sourceId, targetId);
+                } catch (error) {
+                  setActionError(errorMessage(error));
+                  throw error;
+                } finally {
+                  setReorderBusy(false);
+                }
+              }}
             />
           </>
         )}

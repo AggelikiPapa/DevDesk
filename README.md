@@ -143,10 +143,29 @@ session either both do not exist or refer to each other before it mutates data.
 The TypeScript `timeEngine` service is the application boundary for coordinated
 time changes. Ordinary task operations reject direct transitions to `WORKING`,
 and reject status changes or archival for an actively timed task. A non-active
-task can still be completed normally. `DONE` tasks cannot be started; a later
-explicit reopen workflow can define that behavior if needed.
+task can still be completed normally. `DONE` tasks cannot be started directly;
+Reopen returns a completed task to `PAUSED` without starting a timer.
+
+## Live task timer
+
+DD-009 connects the selected task card to the transactional time engine. It shows
+Start, Resume, Pause, or Switch to this task according to the task and global
+active-session state. Completing an active task closes its session through the
+time engine. Selecting another task leaves the current session running; the card
+shows which task is being timed.
+
+The displayed `HH:MM:SS` total is derived from the selected task's persisted
+WorkSessions. While that task is active, a one-second interval refreshes the
+current timestamp for display only. On restart, the workspace loads the global
+active session and selects its task, then reconstructs elapsed time from session
+history. No timer state is written every second.
 
 The initial application identifier is `com.devdesk.desktop`; confirm ownership before
 distribution because changing it later can affect OS identity and data paths.
+
+Tasks can be reordered by dragging their move handles or focusing a handle and
+pressing Up or Down. Migration `0004_add_task_order.sql` preserves the existing
+visible order when upgrading, then saves manual order locally. New tasks appear
+at the top; editing a task no longer changes its list position.
 
 <img width="10000" height="7500" alt="DevDesk_Solution_Architecture" src="https://github.com/user-attachments/assets/bfb21475-c752-4bce-8738-df1d2c2509f1" />

@@ -30,10 +30,12 @@ export interface TaskApplicationService {
   createTask(input: CreateTaskInput): Promise<Task>;
   getTask(id: string): Promise<Task>;
   listActiveTasks(): Promise<Task[]>;
+  reorderTasks(ids: readonly string[]): Promise<void>;
   updateTaskTitle(id: string, title: string): Promise<Task>;
   updateTaskNextAction(id: string, nextAction: string | null): Promise<Task>;
   updateTaskDetails(id: string, input: UpdateTaskDetailsInput): Promise<Task>;
   changeTaskStatus(id: string, status: TaskStatus): Promise<Task>;
+  reopenTask(id: string): Promise<Task>;
   archiveTask(id: string): Promise<Task>;
 }
 
@@ -86,6 +88,18 @@ export function createTaskApplicationService(
       return store.listActiveTasks();
     },
 
+    async reorderTasks(ids) {
+      const active = await store.listActiveTasks();
+      const currentIds = new Set(active.map((task) => task.id));
+      if (ids.length !== active.length || new Set(ids).size !== ids.length ||
+        ids.some((id) => !currentIds.has(id))) {
+        throw new ValidationError("Task order is out of date. Reload and try again.");
+      }
+      if (!await store.reorderTasks(ids)) {
+        throw new ValidationError("Task order could not be saved. Reload and try again.");
+      }
+    },
+
     async updateTaskTitle(id, title) {
       const changed = await store.updateTaskTitle(
         id,
@@ -126,6 +140,15 @@ export function createTaskApplicationService(
         nextStatus,
         currentTimestamp(),
       );
+      return finishMutation(id, changed);
+    },
+
+    async reopenTask(id) {
+      const task = await requireOrdinaryMutation(id);
+      if (task.status !== "DONE") {
+        throw new ValidationError("Only completed tasks can be reopened.");
+      }
+      const changed = await store.changeTaskStatus(id, "PAUSED", currentTimestamp());
       return finishMutation(id, changed);
     },
 

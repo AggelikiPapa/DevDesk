@@ -31,3 +31,11 @@ React controls should call it rather than `invoke()` directly. General Client
 and Task CRUD remains in the existing TypeScript stores. Ordinary task status
 and archive operations include guards so they cannot bypass an active time
 workflow.
+
+DD-009 keeps the selected task ID and the global active WorkSession separately
+in `useTaskWorkspace`. It loads history only for the selected task and refreshes
+that history after time-engine mutations. Native command results update the
+visible task and session state immediately. The timer uses the pure recorded
+duration calculator with an explicit current timestamp, and its interval only
+refreshes that timestamp while the selected task is active. Startup reads task
+and session state without changing persistence.

@@ -13,6 +13,7 @@ const initialTimestamp = "2026-01-01T00:00:00.000Z";
 function createFixture() {
   const clients = new Map();
   const tasks = new Map();
+  let taskOrder = [];
   let clientSequence = 0;
   let taskSequence = 0;
   let activeSession = null;
@@ -51,15 +52,23 @@ function createFixture() {
         archivedAt: null,
       };
       tasks.set(task.id, task);
+      taskOrder = [task.id, ...taskOrder];
       return structuredClone(task);
     },
     async getTask(id) {
       return tasks.has(id) ? structuredClone(tasks.get(id)) : null;
     },
     async listActiveTasks() {
-      return [...tasks.values()]
+      return taskOrder
+        .map((id) => tasks.get(id))
         .filter((task) => task.archivedAt === null)
         .map((task) => structuredClone(task));
+    },
+    async reorderTasks(ids) {
+      const activeIds = taskOrder.filter((id) => tasks.get(id).archivedAt === null);
+      if (ids.length !== activeIds.length || ids.some((id) => !activeIds.includes(id))) return false;
+      taskOrder = [...ids, ...taskOrder.filter((id) => !ids.includes(id))];
+      return true;
     },
     async updateTaskTitle(id, title, updatedAt) {
       return updateTaskWithTimestamp(id, { title }, updatedAt);
@@ -123,6 +132,9 @@ function createFixture() {
     tasks,
     setActiveSession(session) {
       activeSession = session;
+    },
+    getActiveSession() {
+      return activeSession;
     },
   };
 }
@@ -236,6 +248,33 @@ test("persists valid statuses and rejects invalid statuses", async () => {
     fixture.taskService.changeTaskStatus(task.id, "INVALID"),
     ValidationError,
   );
+});
+
+test("reopens only completed tasks as paused without starting a session", async () => {
+  const fixture = createFixture();
+  const { task } = await createClientAndTask(fixture);
+
+  await assert.rejects(fixture.taskService.reopenTask(task.id), ValidationError);
+  await fixture.taskService.changeTaskStatus(task.id, "DONE");
+  const reopened = await fixture.taskService.reopenTask(task.id);
+  assert.equal(reopened.status, "PAUSED");
+  assert.equal(reopened.archivedAt, null);
+  assert.deepEqual(await fixture.taskService.listActiveTasks(), [reopened]);
+  assert.equal(fixture.getActiveSession(), null);
+  await assert.rejects(fixture.taskService.reopenTask(task.id), ValidationError);
+});
+
+test("persists a validated manual order without changing task details", async () => {
+  const fixture = createFixture();
+  const { client, task: first } = await createClientAndTask(fixture);
+  const second = await fixture.taskService.createTask({ clientId: client.id, title: "Second" });
+  assert.deepEqual((await fixture.taskService.listActiveTasks()).map((task) => task.id), [second.id, first.id]);
+
+  await fixture.taskService.reorderTasks([first.id, second.id]);
+  assert.deepEqual(await fixture.taskService.listActiveTasks(), [first, second]);
+  await assert.rejects(fixture.taskService.reorderTasks([first.id, first.id]), ValidationError);
+  await assert.rejects(fixture.taskService.reorderTasks([first.id]), ValidationError);
+  await assert.rejects(fixture.taskService.reorderTasks([first.id, "missing"]), ValidationError);
 });
 
 test("ordinary task service cannot create or change a task to WORKING", async () => {

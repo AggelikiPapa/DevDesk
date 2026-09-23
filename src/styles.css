@@ -19,6 +19,17 @@ body { margin: 0; }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 h1, h2, h3, p { margin: 0; }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: 3px solid #2765ba;
   outline-offset: 2px;
@@ -80,6 +91,16 @@ main { display: grid; gap: 10px; }
 .eyebrow { font-size: 10px; color: var(--muted); }
 .next-action p { margin-top: 2px; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 .status { color: var(--muted); font-size: 9px; line-height: 1.3; font-weight: 600; }
+.active-task-hint { margin-top: 7px; color: var(--accent); font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
+.task-timer {
+  margin-top: 8px;
+  color: #293b36;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 21px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: -0.5px;
+}
 
 .task-controls {
   display: flex;
@@ -115,6 +136,22 @@ button:disabled { cursor: wait; opacity: 0.6; }
 }
 .task-list { padding: 0; margin: 5px 0 0; list-style: none; }
 .task-list li + li { border-top: 1px solid var(--line); }
+.task-list-item { display: flex; align-items: stretch; gap: 5px; border-radius: 4px; }
+.task-list-item.drop-target { background: #e1ece7; outline: 2px solid var(--accent); }
+.task-list-item .task-row { flex: 1; }
+.move-task {
+  flex: 0 0 22px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: grab;
+  font-size: 16px;
+  touch-action: none;
+  user-select: none;
+}
+.move-task:active { cursor: grabbing; }
+.move-task:disabled { cursor: wait; }
 .task-row {
   display: block;
   width: 100%;
@@ -129,6 +166,7 @@ button:disabled { cursor: wait; opacity: 0.6; }
 }
 .task-row:hover { background: #f0f3f3; }
 .task-row.selected { background: #e8f0ed; border-color: #c7d9d2; }
+.task-row.working .status { color: var(--accent); font-weight: 750; }
 .row-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 7px; }
 .row-meta .status { margin-left: auto; }
 .row-client { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }

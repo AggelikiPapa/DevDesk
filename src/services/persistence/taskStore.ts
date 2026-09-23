@@ -25,6 +25,7 @@ export interface TaskStore {
   createTask(input: CreateTaskInput): Promise<Task>;
   getTask(id: string): Promise<Task | null>;
   listActiveTasks(): Promise<Task[]>;
+  reorderTasks(ids: readonly string[]): Promise<boolean>;
   updateTaskTitle(id: string, title: string, updatedAt: string): Promise<boolean>;
   updateTaskNextAction(id: string, nextAction: string | null, updatedAt: string): Promise<boolean>;
   updateTaskDetails(
@@ -56,8 +57,9 @@ export async function createTask(input: CreateTaskInput): Promise<Task> {
   await database.execute(
     `INSERT INTO tasks (
        id, client_id, external_key, title, status, next_action,
-       created_at, updated_at, archived_at
-     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       created_at, updated_at, archived_at, sort_order
+     ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
+       (SELECT COALESCE(MIN(sort_order), 0) - 1 FROM tasks WHERE archived_at IS NULL))`,
     [
       task.id,
       task.clientId,
@@ -81,10 +83,30 @@ export async function listActiveTasks(): Promise<Task[]> {
             created_at, updated_at, archived_at
      FROM tasks
      WHERE archived_at IS NULL
-     ORDER BY updated_at DESC, id`,
+     ORDER BY sort_order, id`,
   );
 
   return rows.map(mapTask);
+}
+
+export async function reorderTasks(ids: readonly string[]): Promise<boolean> {
+  if (ids.length === 0) return true;
+  const database = await getDatabase();
+  const cases = ids.map((_, index) => `WHEN $${index + 1} THEN ${index}`).join(" ");
+  const placeholders = ids.map((_, index) => `$${index + 1}`).join(", ");
+  const result = await database.execute(
+    `UPDATE tasks
+     SET sort_order = CASE id ${cases} END
+     WHERE archived_at IS NULL
+       AND id IN (${placeholders})
+       AND (SELECT COUNT(*) FROM tasks WHERE archived_at IS NULL) = ${ids.length}
+       AND NOT EXISTS (
+         SELECT 1 FROM tasks AS active
+         WHERE active.archived_at IS NULL AND active.id NOT IN (${placeholders})
+       )`,
+    [...ids],
+  );
+  return result.rowsAffected === ids.length;
 }
 
 export async function getTask(id: string): Promise<Task | null> {
@@ -216,6 +238,7 @@ export const taskStore: TaskStore = {
   createTask,
   getTask,
   listActiveTasks,
+  reorderTasks,
   updateTaskNextAction,
   updateTaskDetails,
   updateTaskTitle,
