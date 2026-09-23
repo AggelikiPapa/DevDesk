@@ -175,7 +175,13 @@ export async function changeTaskStatus(
            WHEN updated_at < $2 THEN $2
            ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
          END
-     WHERE id = $3`,
+     WHERE id = $3
+       AND $1 <> 'WORKING'
+       AND status <> 'WORKING'
+       AND NOT EXISTS (
+         SELECT 1 FROM work_sessions
+         WHERE ended_at IS NULL AND task_id = tasks.id
+       )`,
     [status, updatedAt, id],
   );
   return result.rowsAffected === 1;
@@ -193,7 +199,12 @@ export async function archiveTask(id: string, archivedAt: string): Promise<boole
            WHEN updated_at < $1 THEN $1
            ELSE strftime('%Y-%m-%dT%H:%M:%fZ', updated_at, '+0.001 seconds')
          END
-     WHERE id = $2`,
+     WHERE id = $2
+       AND status <> 'WORKING'
+       AND NOT EXISTS (
+         SELECT 1 FROM work_sessions
+         WHERE ended_at IS NULL AND task_id = tasks.id
+       )`,
     [archivedAt, id],
   );
   return result.rowsAffected === 1;

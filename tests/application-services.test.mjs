@@ -15,6 +15,7 @@ function createFixture() {
   const tasks = new Map();
   let clientSequence = 0;
   let taskSequence = 0;
+  let activeSession = null;
 
   const clientStore = {
     async createClient(input) {
@@ -81,6 +82,12 @@ function createFixture() {
     },
   };
 
+  const workSessionStore = {
+    async getActiveWorkSession() {
+      return activeSession ? structuredClone(activeSession) : null;
+    },
+  };
+
   function updateTask(id, changes) {
     const task = tasks.get(id);
     if (!task) return false;
@@ -103,9 +110,21 @@ function createFixture() {
   }
 
   const clientService = createClientApplicationService(clientStore);
-  const taskService = createTaskApplicationService(taskStore, clientService);
+  const taskService = createTaskApplicationService(
+    taskStore,
+    clientService,
+    workSessionStore,
+  );
 
-  return { clientService, taskService, clients, tasks };
+  return {
+    clientService,
+    taskService,
+    clients,
+    tasks,
+    setActiveSession(session) {
+      activeSession = session;
+    },
+  };
 }
 
 async function createClientAndTask(fixture, overrides = {}) {
@@ -217,6 +236,69 @@ test("persists valid statuses and rejects invalid statuses", async () => {
     fixture.taskService.changeTaskStatus(task.id, "INVALID"),
     ValidationError,
   );
+});
+
+test("ordinary task service cannot create or change a task to WORKING", async () => {
+  const fixture = createFixture();
+  const client = await fixture.clientService.createClient({ name: "Acme" });
+
+  await assert.rejects(
+    fixture.taskService.createTask({
+      clientId: client.id,
+      title: "Invalid working task",
+      status: "WORKING",
+    }),
+    ValidationError,
+  );
+
+  const task = await fixture.taskService.createTask({
+    clientId: client.id,
+    title: "Valid task",
+  });
+  await assert.rejects(
+    fixture.taskService.changeTaskStatus(task.id, "WORKING"),
+    ValidationError,
+  );
+  assert.equal(fixture.tasks.get(task.id).status, "NEW");
+});
+
+test("ordinary completion and archival reject an actively timed task", async () => {
+  const fixture = createFixture();
+  const { task } = await createClientAndTask(fixture);
+  fixture.tasks.set(task.id, { ...task, status: "WORKING" });
+  fixture.setActiveSession({
+    id: "session-1",
+    taskId: task.id,
+    startedAt: initialTimestamp,
+    endedAt: null,
+    createdAt: initialTimestamp,
+  });
+
+  await assert.rejects(
+    fixture.taskService.changeTaskStatus(task.id, "DONE"),
+    ValidationError,
+  );
+  await assert.rejects(
+    fixture.taskService.archiveTask(task.id),
+    ValidationError,
+  );
+  assert.equal(fixture.tasks.get(task.id).status, "WORKING");
+  assert.equal(fixture.tasks.get(task.id).archivedAt, null);
+});
+
+test("ordinary completion remains available for a non-active task", async () => {
+  const fixture = createFixture();
+  const { task } = await createClientAndTask(fixture);
+  fixture.setActiveSession({
+    id: "session-1",
+    taskId: "another-task",
+    startedAt: initialTimestamp,
+    endedAt: null,
+    createdAt: initialTimestamp,
+  });
+
+  const completed = await fixture.taskService.changeTaskStatus(task.id, "DONE");
+  assert.equal(completed.status, "DONE");
 });
 
 test("archives without deleting or changing other task data", async () => {

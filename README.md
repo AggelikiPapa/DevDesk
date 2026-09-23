@@ -124,10 +124,27 @@ The WorkSession application service intentionally exposes read operations and
 duration calculation only. Session creation and closure remain low-level store
 operations until the time engine can coordinate them with task status changes.
 The frontend SQL plugin does not expose a transaction handle: separate calls use
-a SQLx connection pool and cannot safely bracket `BEGIN`/`COMMIT`. DD-008 should
-therefore implement narrow native Rust commands that acquire one SQLite pool
-connection and perform each Start, Pause, or Switch workflow in one SQLx
-transaction.
+a SQLx connection pool and cannot safely bracket `BEGIN`/`COMMIT`.
+
+## Transactional time engine
+
+DD-008 adds native Rust commands for Start/Resume, Pause, Switch, and completing
+an active task. The commands reuse the SQL plugin's preloaded SQLite pool and run
+each workflow in one SQLx transaction. One canonical UTC timestamp is reused for
+every change in a workflow, so a task switch closes the previous session at the
+exact timestamp used to start the next session.
+
+Migration `0003_enforce_single_working_task.sql` adds a partial unique index that
+allows at most one task with `status = 'WORKING'`. Together with the existing
+single-active-session index, this protects concurrent operations at the database
+level. The native engine also validates that the one WORKING task and active
+session either both do not exist or refer to each other before it mutates data.
+
+The TypeScript `timeEngine` service is the application boundary for coordinated
+time changes. Ordinary task operations reject direct transitions to `WORKING`,
+and reject status changes or archival for an actively timed task. A non-active
+task can still be completed normally. `DONE` tasks cannot be started; a later
+explicit reopen workflow can define that behavior if needed.
 
 The initial application identifier is `com.devdesk.desktop`; confirm ownership before
 distribution because changing it later can affect OS identity and data paths.

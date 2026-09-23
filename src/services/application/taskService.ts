@@ -1,12 +1,16 @@
 import type { ClientId, Task, TaskStatus } from "../../types/domain.ts";
 import type { ClientApplicationService } from "./clientService.ts";
 import { clientService } from "./clientService.ts";
-import { EntityNotFoundError } from "./errors.ts";
+import { EntityNotFoundError, ValidationError } from "./errors.ts";
 import { currentTimestamp, optionalText, requiredText, requireTaskStatus } from "./rules.ts";
 import {
   taskStore,
   type TaskStore,
 } from "../persistence/taskStore.ts";
+import {
+  workSessionStore,
+  type WorkSessionStore,
+} from "../persistence/workSessionStore.ts";
 
 export interface CreateTaskInput {
   clientId: ClientId;
@@ -36,6 +40,7 @@ export interface TaskApplicationService {
 export function createTaskApplicationService(
   store: TaskStore = taskStore,
   clients: Pick<ClientApplicationService, "getClient"> = clientService,
+  sessions: Pick<WorkSessionStore, "getActiveWorkSession"> = workSessionStore,
 ): TaskApplicationService {
   async function getTask(id: string): Promise<Task> {
     const task = await store.getTask(id);
@@ -48,14 +53,29 @@ export function createTaskApplicationService(
     return getTask(id);
   }
 
+  async function requireOrdinaryMutation(id: string): Promise<Task> {
+    const task = await getTask(id);
+    const activeSession = await sessions.getActiveWorkSession();
+    if (task.status === "WORKING" || activeSession?.taskId === id) {
+      throw new ValidationError(
+        "An active task must be paused or completed through the time engine.",
+      );
+    }
+    return task;
+  }
+
   return {
     async createTask(input) {
       await clients.getClient(input.clientId);
+      const status = requireTaskStatus(input.status ?? "NEW");
+      if (status === "WORKING") {
+        throw new ValidationError("Tasks must be started through the time engine.");
+      }
       return store.createTask({
         clientId: input.clientId,
         externalKey: optionalText(input.externalKey),
         title: requiredText(input.title, "Task title"),
-        status: requireTaskStatus(input.status ?? "NEW"),
+        status,
         nextAction: optionalText(input.nextAction),
       });
     },
@@ -96,15 +116,21 @@ export function createTaskApplicationService(
     },
 
     async changeTaskStatus(id, status) {
+      const nextStatus = requireTaskStatus(status);
+      if (nextStatus === "WORKING") {
+        throw new ValidationError("Tasks must be started through the time engine.");
+      }
+      await requireOrdinaryMutation(id);
       const changed = await store.changeTaskStatus(
         id,
-        requireTaskStatus(status),
+        nextStatus,
         currentTimestamp(),
       );
       return finishMutation(id, changed);
     },
 
     async archiveTask(id) {
+      await requireOrdinaryMutation(id);
       const changed = await store.archiveTask(id, currentTimestamp());
       return finishMutation(id, changed);
     },
