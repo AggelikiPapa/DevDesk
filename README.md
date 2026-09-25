@@ -62,8 +62,9 @@ Tauri focus events and the public AppKit `NSWindow.alphaValue` API in
 `src-tauri/src/window_appearance.rs`; it does not enable macOS private APIs.
 
 The UI uses the existing light theme and plain CSS. The native title bar supplies
-the application heading, and content scrolls vertically when needed at compact
-window sizes. Today and Settings remain unavailable placeholders.
+the application heading. Tasks and Today scroll inside the content area when
+needed, while the bottom navigation stays visible at compact window sizes.
+Settings remains an unavailable placeholder.
 
 ## Local persistence
 
@@ -167,5 +168,24 @@ Tasks can be reordered by dragging their move handles or focusing a handle and
 pressing Up or Down. Migration `0004_add_task_order.sql` preserves the existing
 visible order when upgrading, then saves manual order locally. New tasks appear
 at the top; editing a task no longer changes its list position.
+
+## Today
+
+DD-010 adds a read-only Today view alongside Tasks. The report queries only
+WorkSessions that overlap the user's local calendar day, including sessions on
+archived tasks. It joins task and client labels in one query, then clips each
+session to local midnight boundaries in pure TypeScript. Boundaries are converted
+to UTC for comparison; the next local midnight is constructed as a calendar date,
+so daylight-saving days can contain 23 or 25 hours.
+
+The report sums clipped time by client and by task, showing clients and tasks in
+descending tracked-time order with deterministic name/ID ties. Its timeline keeps
+each WorkSession separate in chronological order. Active sessions use an explicit
+current time and refresh visually about once per second without writing to SQLite.
+Displayed durations round each session down to whole seconds before summing, so
+the visible client, task, and total figures add up consistently; report calculations
+retain exact millisecond durations.
+When Today stays open across midnight, it reloads the new day's overlaps. Tasks
+remains mounted while Today is open, so navigation does not stop active work.
 
 <img width="10000" height="7500" alt="DevDesk_Solution_Architecture" src="https://github.com/user-attachments/assets/bfb21475-c752-4bce-8738-df1d2c2509f1" />

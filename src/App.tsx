@@ -3,12 +3,14 @@ import { BottomNavigation } from "./components/BottomNavigation";
 import { CurrentTask } from "./components/CurrentTask";
 import { EditTaskForm } from "./components/EditTaskForm";
 import { TaskList } from "./components/TaskList";
+import { TodayView } from "./components/TodayView";
 import { FormDialog, TaskForm } from "./components/TaskForm";
 import { clientLabel } from "./features/tasks/taskPresentation.ts";
 import { errorMessage, useTaskWorkspace } from "./features/tasks/useTaskWorkspace.ts";
 
 export default function App() {
   const workspace = useTaskWorkspace();
+  const [view, setView] = useState<"tasks" | "today">("tasks");
   const [form, setForm] = useState<"add" | "edit" | "archive" | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const [reorderBusy, setReorderBusy] = useState(false);
@@ -71,6 +73,8 @@ export default function App() {
   return (
     <div className="app-shell">
       <main>
+        {view === "today" ? <TodayView /> : (
+        <>
         {workspace.loading ? (
           <p className="loading-state" role="status">Loading tasks…</p>
         ) : (
@@ -120,8 +124,10 @@ export default function App() {
             />
           </>
         )}
+        </>
+        )}
       </main>
-      <BottomNavigation />
+      <BottomNavigation view={view} onView={setView} />
       {form === "add" && (
         <TaskForm
           clients={workspace.clients}

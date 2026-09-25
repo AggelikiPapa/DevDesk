@@ -39,3 +39,13 @@ visible task and session state immediately. The timer uses the pure recorded
 duration calculator with an explicit current timestamp, and its interval only
 refreshes that timestamp while the selected task is active. Startup reads task
 and session state without changing persistence.
+
+DD-010 isolates read-only daily reporting in `todayStore`, `todayService`, and
+`useTodayWorkspace`. The store selects only WorkSessions overlapping a UTC range
+and joins their Task and Client labels, including archived tasks. The application
+service derives local calendar-day boundaries, clips each session interval, and
+groups client/task totals without changing stored sessions. The Today hook fetches
+on entry and at the next local date, while its one-second clock only recalculates
+the visible active duration. The Tasks workspace stays mounted across view changes.
+No new index is added: the report is limited to one day and current local data
+volume is small; an interval-oriented index can follow measured query costs.
